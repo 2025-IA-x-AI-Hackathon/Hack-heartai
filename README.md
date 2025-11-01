@@ -34,19 +34,6 @@ Hack-heartai/
 - 권장사항 생성
 
 
-### 데이터 수집 (안드로이드 앱용)
-
-- `POST /collect-sensor-data`: 단일 데이터 포인트 전송
-- `POST /collect-sensor-data-batch`: 배치 데이터 전송
-- `GET /get-daily-data/{patient_id}`: 일일 데이터 조회
-- `GET /get-weekly-data/{patient_id}`: 주별 데이터 조회
-
-### 분석 및 보고서
-
-- `POST /analyze-weekly`: 주별 데이터 분석
-- `POST /analyze-weekly-from-db/{patient_id}`: DB에서 자동 분석
-- `POST /generate-report`: 의료진용 보고서 생성
-
 ## 안드로이드 앱 개발
 
 ### 주요 구현 사항
@@ -56,20 +43,8 @@ Hack-heartai/
 3. **백그라운드 수집**: WorkManager를 사용한 주기적 데이터 수집
 4. **오프라인 지원**: 네트워크 없을 때 로컬 저장 후 동기화
 
-## 데이터 흐름
-
-```
-안드로이드 앱 → POST /collect-sensor-data → SQLite DB
-                                              ↓
-의료진 대시보드 → GET /get-weekly-data → POST /analyze-weekly-from-db
-                                              ↓
-                                          MADRS 예측 결과
-                                              ↓
-                                          보고서 생성
-```
 
 ## 모델 학습
-
 기존 모델을 사용하거나 새로운 데이터로 재학습:
 
 ```bash
