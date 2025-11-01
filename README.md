@@ -35,22 +35,6 @@ Hack-heartai/
 
 ## 시작하기
 
-### 백엔드 설정
-
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app:app --reload --port 8000
-```
-
-### 프론트엔드 설정
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
 ### 안드로이드 앱 개발
 
 `android/` 폴더의 가이드를 참고하여 안드로이드 앱을 개발하세요.
