@@ -7,6 +7,8 @@ import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+import joblib
+from pathlib import Path
 # Input data files are available in the read-only "../input/" director
 # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
 
@@ -67,9 +69,17 @@ if len(feature_importance_df) > 1:
     print(f"  - 영향: {feature_importance_df.iloc[1]['Impact']}")
 
 # CSV 파일로 저장 (보고서용)
-feature_importance_df.to_csv('feature_importance_report.csv', index=False, encoding='utf-8-sig')
-print("\n[보고서 파일 저장 완료]")
-print("feature_importance_report.csv 파일이 생성되었습니다.")
+save_dir = Path(__file__).parent  # 현재 train_model.py가 있는 폴더(model/)
+csv_path = save_dir / 'feature_importance_report.csv'
+try:
+    feature_importance_df.to_csv(csv_path, index=False, encoding='utf-8-sig')
+    print("\n[보고서 파일 저장 완료]")
+    print(f"feature_importance_report.csv 파일이 생성되었습니다: {csv_path}")
+except PermissionError as e:
+    print(f"\n[⚠️ 경고] 파일 저장 실패 (파일이 다른 프로그램에서 열려있을 수 있습니다)")
+    print(f"파일 경로: {csv_path}")
+    print(f"에러: {e}")
+    print("해결 방법: Excel이나 다른 프로그램에서 해당 CSV 파일을 닫고 다시 시도하세요.")
 
 # ====================================================================
 # 개별 인스턴스 예측 기여도 분석
@@ -152,12 +162,17 @@ for idx in sample_indices:
     contribution_df['Predicted_Label'] = prediction
     contribution_df['Prediction_Probability'] = prediction_proba[1]
     
-    output_file = f'individual_contribution_{idx}.csv'
-    contribution_df[['Individual_ID', 'Feature', 'Feature_Value', 'Coefficient', 
-                     'Contribution', 'Abs_Contribution', 'Impact', 
-                     'Actual_Label', 'Predicted_Label', 'Prediction_Probability']].to_csv(
-        output_file, index=False, encoding='utf-8-sig')
-    print(f"  → {output_file} 파일로 저장됨")
+    output_file = save_dir / f'individual_contribution_{idx}.csv'
+    try:
+        contribution_df[['Individual_ID', 'Feature', 'Feature_Value', 'Coefficient', 
+                         'Contribution', 'Abs_Contribution', 'Impact', 
+                         'Actual_Label', 'Predicted_Label', 'Prediction_Probability']].to_csv(
+            output_file, index=False, encoding='utf-8-sig')
+        print(f"  → {output_file.name} 파일로 저장됨")
+    except PermissionError as e:
+        print(f"  → ⚠️ {output_file.name} 파일 저장 실패 (파일이 Excel이나 다른 프로그램에서 열려있을 수 있습니다)")
+        print(f"     파일 경로: {output_file}")
+        print(f"     해결 방법: 해당 CSV 파일을 닫고 다시 시도하세요.")
 
 print("\n" + "="*60)
 print("개별 인스턴스 분석 완료")
@@ -208,3 +223,19 @@ from train_model_new_data import analyze_individual
 기여도_df, 확률, 예측 = analyze_individual(model, 개인_데이터, x.columns)
 print(기여도_df)
 """)
+
+# 모델 저장 (이미 save_dir은 위에서 정의됨)
+model_path = save_dir / "model.joblib"
+feature_path = save_dir / "feature_order.joblib"
+
+try:
+    joblib.dump(model, model_path)
+    joblib.dump(list(x.columns), feature_path)
+    print(f"\n[✅ 모델 저장 완료]")
+    print(f" - model: {model_path.resolve()}")
+    print(f" - feature_order: {feature_path.resolve()}")
+except PermissionError as e:
+    print(f"\n[⚠️ 경고] 모델 저장 실패 (파일이 다른 프로그램에서 열려있을 수 있습니다)")
+    print(f"파일 경로: {model_path} 또는 {feature_path}")
+    print(f"에러: {e}")
+    print("해결 방법: 해당 파일을 사용하는 프로그램을 종료하고 다시 시도하세요.")
