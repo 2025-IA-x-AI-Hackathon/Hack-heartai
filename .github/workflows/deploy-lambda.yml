@@ -10,10 +10,11 @@ permissions:
   id-token: write
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_PAGER: ""                          # <-- CLI pager 끄기(less 방지)
+  AWS_REGION: ${{ secrets.AWS_REGION }}  # ap-northeast-2 로 맞춰 두기
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  ECR_REPO: ${{ secrets.ECR_REPO }}
-  LAMBDA_FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME }}
+  ECR_REPO: ${{ secrets.ECR_REPO }}      # stress7-lambda
+  LAMBDA_FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME }}  # stress7-fn
   LAMBDA_ROLE_ARN: ${{ secrets.LAMBDA_ROLE_ARN }}
 
 jobs:
@@ -42,18 +43,16 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: lambda.Dockerfile      # 루트에 lambda.Dockerfile 있어야 함
+          file: lambda.Dockerfile           # 루트에 이 파일 있어야 함
           push: true
           tags: |
             ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO }}:latest
 
-      # --- 여기부터 핵심 수정 ---
       - name: Create or Update Lambda (idempotent)
         shell: bash
         run: |
           set -e
           IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest"
-
           if aws lambda get-function --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
             echo "[Update] Lambda exists → updating code"
             aws lambda update-function-code \
@@ -75,7 +74,6 @@ jobs:
       - name: Wait until Lambda is Active
         shell: bash
         run: |
-          set -e
           echo "Waiting for Lambda to become Active..."
           for i in {1..60}; do
             STATE=$(aws lambda get-function \
@@ -84,27 +82,47 @@ jobs:
               --query 'Configuration.State' \
               --output text 2>/dev/null || echo "Unknown")
             echo "  Attempt $i: State=$STATE"
-            if [ "$STATE" = "Active" ]; then
-              break
-            fi
+            [ "$STATE" = "Active" ] && break
             sleep 5
           done
-          if [ "$STATE" != "Active" ]; then
-            echo "Lambda did not become Active in time"; exit 1
-          fi
+          [ "$STATE" = "Active" ] || { echo "Lambda did not become Active in time"; exit 1; }
 
-      - name: Ensure Function URL (public)
+      # ★ 핵심 1: URL 설정을 항상 NONE 으로 강제
+      - name: Ensure Function URL (force NONE & CORS *)
         shell: bash
         run: |
-          set +e
-          aws lambda get-function-url-config --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" >/dev/null 2>&1
-          if [ $? -ne 0 ]; then
+          if aws lambda get-function-url-config --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
+            aws lambda update-function-url-config \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --auth-type NONE \
+              --cors 'AllowOrigins=["*"],AllowMethods=["*"],AllowHeaders=["*"]' \
+              --region "$AWS_REGION"
+          else
             aws lambda create-function-url-config \
               --function-name "$LAMBDA_FUNCTION_NAME" \
               --auth-type NONE \
               --cors 'AllowOrigins=["*"],AllowMethods=["*"],AllowHeaders=["*"]' \
               --region "$AWS_REGION"
           fi
-          set -e
+
+      # ★ 핵심 2: 공개 호출 퍼미션(없으면 추가, 있으면 스킵)
+      - name: Ensure public permission for Function URL
+        shell: bash
+        run: |
+          SID="FunctionURLAllowPublic"
+          if ! aws lambda get-policy --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" 2>/dev/null | grep -q "$SID"; then
+            aws lambda add-permission \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --statement-id "$SID" \
+              --action "lambda:InvokeFunctionUrl" \
+              --principal "*" \
+              --function-url-auth-type NONE \
+              --region "$AWS_REGION"
+          fi
+
+      - name: Show Function URL
+        shell: bash
+        run: |
           URL=$(aws lambda get-function-url-config --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" --query FunctionUrl --output text)
           echo "✅ Function URL: $URL"
+          echo "Function URL: $URL" >> $GITHUB_STEP_SUMMARY
