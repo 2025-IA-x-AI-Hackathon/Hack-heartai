@@ -8,9 +8,7 @@
 Hack-heartai/
 ├── backend/          # FastAPI 백엔드 서버
 ├── frontend/         # React 프론트엔드
-├── android/          # 안드로이드 앱 개발 가이드 및 예제 코드
 ├── model/            # 머신러닝 모델 학습 및 저장
-└── data/             # SQLite 데이터베이스 (자동 생성)
 ```
 
 ## 주요 기능
