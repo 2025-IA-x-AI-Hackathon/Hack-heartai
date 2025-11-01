@@ -44,7 +44,7 @@ Hack-heartai/
 ## 🚀 팀원 소개
 |김수정|성나연|오혜인|이동현|
 |:-:|:-:|:-:|:-:|
-|<img width="100px" alt="수정" src="https://avatars.githubusercontent.com/u/80269953?v=4">|<img width="100px" alt="나연" src="https://avatars.githubusercontent.com/u/88431909?v=4">|<img width="100px" alt="혜인" src="https://avatars.githubusercontent.com/u/120189161?v=4">|<img width="100px" alt="동현" src="https://avatars.githubusercontent.com/u/146572390?v=4">
+|<img width="100px" alt="수정" src="https://github.com/user-attachments/assets/613fa615-0501-44b3-b44f-986bf3017ba2">|<img width="100px" alt="나연" src="https://github.com/user-attachments/assets/9d2458eb-1390-4963-b948-bf8039ce710c">|<img width="100px" alt="혜인" src="https://github.com/user-attachments/assets/f7683a51-8ef5-47b1-9d48-2dcf5ab38890">|<img width="100px" alt="동현" src="https://github.com/user-attachments/assets/32a682a1-7ec0-434c-a82d-1609c768afc6">
 |[@peachily](https://github.com/peachily)|[@nayeonnn22](https://github.com/nayeonnn22)|[@haein45](https://github.com/haein45)|[@cauchy-P](https://github.com/cauchy-P)|
 
 ### 시안
