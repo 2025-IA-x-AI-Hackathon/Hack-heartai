@@ -1,4 +1,8 @@
-fastapi
-uvicorn
-numpy
-gunicorn
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+joblib==1.4.2
+numpy==1.26.4
+pydantic==2.8.2
+scikit-learn==1.2.2
+pandas==2.2.3
+starlette==0.37.2
