@@ -40,3 +40,6 @@ Hack-heartai/
 
 ### 보안 / 인증
 - **Lambda Function URL**
+
+### 시안
+![FIGMA 시안](./model_diagram.png)
