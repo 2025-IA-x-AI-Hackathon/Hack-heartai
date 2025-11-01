@@ -2,7 +2,8 @@ name: Deploy to AWS Lambda (Container)
 
 on:
   push:
-    branches: [ "main" ]   # main에 push되면 자동 배포
+    branches: [ "main" ]
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -37,40 +38,66 @@ jobs:
           aws ecr describe-repositories --repository-names "$ECR_REPO" --region "$AWS_REGION" \
           || aws ecr create-repository --repository-name "$ECR_REPO" --region "$AWS_REGION"
 
-      - name: Build and push image to ECR
+      - name: Build & push container image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: lambda.Dockerfile
+          file: lambda.Dockerfile      # 루트에 lambda.Dockerfile 있어야 함
           push: true
           tags: |
             ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO }}:latest
 
-      - name: Create Lambda function if not exists
-        continue-on-error: true
+      # --- 여기부터 핵심 수정 ---
+      - name: Create or Update Lambda (idempotent)
+        shell: bash
         run: |
+          set -e
           IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest"
-          aws lambda create-function \
-            --function-name "$LAMBDA_FUNCTION_NAME" \
-            --package-type Image \
-            --code ImageUri="$IMAGE_URI" \
-            --role "$LAMBDA_ROLE_ARN" \
-            --memory-size 1024 \
-            --timeout 30 \
-            --region "$AWS_REGION"
 
-      - name: Update Lambda function code
+          if aws lambda get-function --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
+            echo "[Update] Lambda exists → updating code"
+            aws lambda update-function-code \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --image-uri "$IMAGE_URI" \
+              --region "$AWS_REGION"
+          else
+            echo "[Create] Lambda not found → creating"
+            aws lambda create-function \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --package-type Image \
+              --code ImageUri="$IMAGE_URI" \
+              --role "$LAMBDA_ROLE_ARN" \
+              --memory-size 1024 \
+              --timeout 30 \
+              --region "$AWS_REGION"
+          fi
+
+      - name: Wait until Lambda is Active
+        shell: bash
         run: |
-          IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:latest"
-          aws lambda update-function-code \
-            --function-name "$LAMBDA_FUNCTION_NAME" \
-            --image-uri "$IMAGE_URI" \
-            --region "$AWS_REGION"
+          set -e
+          echo "Waiting for Lambda to become Active..."
+          for i in {1..60}; do
+            STATE=$(aws lambda get-function \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --region "$AWS_REGION" \
+              --query 'Configuration.State' \
+              --output text 2>/dev/null || echo "Unknown")
+            echo "  Attempt $i: State=$STATE"
+            if [ "$STATE" = "Active" ]; then
+              break
+            fi
+            sleep 5
+          done
+          if [ "$STATE" != "Active" ]; then
+            echo "Lambda did not become Active in time"; exit 1
+          fi
 
       - name: Ensure Function URL (public)
+        shell: bash
         run: |
           set +e
-          aws lambda get-function-url-config --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION"
+          aws lambda get-function-url-config --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" >/dev/null 2>&1
           if [ $? -ne 0 ]; then
             aws lambda create-function-url-config \
               --function-name "$LAMBDA_FUNCTION_NAME" \
@@ -79,8 +106,5 @@ jobs:
               --region "$AWS_REGION"
           fi
           set -e
-
-      - name: Show Function URL
-        run: |
           URL=$(aws lambda get-function-url-config --function-name "$LAMBDA_FUNCTION_NAME" --region "$AWS_REGION" --query FunctionUrl --output text)
           echo "✅ Function URL: $URL"
